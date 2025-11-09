@@ -3,7 +3,7 @@ return {
   config = function()
     require('lualine').setup({
       options = {
-        theme = "powerline_dark"
+        theme = "16color"
       }
     })
   end

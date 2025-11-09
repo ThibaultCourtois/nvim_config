@@ -1,203 +1,150 @@
 -- ~/.config/nvim/lua/keymaps.lua
 local M = {}
 
--- Keymaps généraux (non-LSP)
+-- Keymaps généraux
 function M.setup_general_keymaps()
   local opts = { silent = true }
 
-  -- Navigation entre fenêtres
-  vim.keymap.set('n', '<C-h>', '<C-w>h', vim.tbl_extend('force', opts, { desc = 'Move to left window' }))
-  vim.keymap.set('n', '<C-j>', '<C-w>j', vim.tbl_extend('force', opts, { desc = 'Move to bottom window' }))
-  vim.keymap.set('n', '<C-k>', '<C-w>k', vim.tbl_extend('force', opts, { desc = 'Move to top window' }))
-  vim.keymap.set('n', '<C-l>', '<C-w>l', vim.tbl_extend('force', opts, { desc = 'Move to right window' }))
+  -- NAVIGATION FENÊTRES
+  vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Fenêtre gauche' })
+  vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Fenêtre bas' })
+  vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Fenêtre haut' })
+  vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Fenêtre droite' })
 
-  -- Navigation entre buffers
-  vim.keymap.set('n', '<Tab>', ':BufferLineCycleNext<CR>', vim.tbl_extend('force', opts, { desc = 'Next buffer' }))
-  vim.keymap.set('n', '<S-Tab>', ':BufferLineCyclePrev<CR>', vim.tbl_extend('force', opts, { desc = 'Previous buffer' }))
+  -- BUFFERS
+  vim.keymap.set('n', '<Tab>', ':BufferLineCycleNext<CR>', { desc = 'Buffer suivant' })
+  vim.keymap.set('n', '<S-Tab>', ':BufferLineCyclePrev<CR>', { desc = 'Buffer précédent' })
 
-  -- Fermer buffer actuel sans fermer la fenêtre
-  vim.keymap.set('n', '<leader>x', ':BufferLinePickClose<CR>', vim.tbl_extend('force', opts, { desc = 'Close buffer' }))
+  vim.keymap.set('n', '<leader>x', function()
+    local current_buf = vim.api.nvim_get_current_buf()
+    local normal_buffers = {}
+    for _, buf in ipairs(vim.fn.getbufinfo({buflisted = 1})) do
+      local bufname = buf.name
+      if not bufname:match("neo%-tree") then
+        table.insert(normal_buffers, buf.bufnr)
+      end
+    end
+    if #normal_buffers > 1 then
+      vim.cmd('bprevious')
+      vim.cmd('bdelete ' .. current_buf)
+    else
+      vim.cmd('Alpha')
+      vim.defer_fn(function()
+        if vim.api.nvim_buf_is_valid(current_buf) then
+          vim.api.nvim_buf_delete(current_buf, {force = true})
+        end
+      end, 10)
+    end
+  end, { desc = 'Fermer buffer' })
 
-  -- Raccourcis pratiques
-  vim.keymap.set('n', '<leader>w', ':w<CR>', vim.tbl_extend('force', opts, { desc = 'Save file' }))
-  vim.keymap.set('n', '<leader>q', ':q<CR>', vim.tbl_extend('force', opts, { desc = 'Quit' }))
+  vim.keymap.set('n', '<leader>w', ':w<CR>', { desc = 'Sauvegarder' })
+  vim.keymap.set('n', '<leader>q', ':q<CR>', { desc = 'Quitter' })
 
-  -- Which-key helper
-  vim.keymap.set('n', '<leader>?', function()
-    require("which-key").show({ global = true })
-  end, vim.tbl_extend('force', opts, { desc = 'Show all keymaps' }))
+  -- CHEAT SHEET
+  vim.keymap.set('n', '<leader>h', function()
+    M.show_cheatsheet()
+  end, { desc = 'Cheat sheet' })
 end
 
--- Keymaps diagnostics
+-- Keymaps diagnostics (simplifiés)
 function M.setup_diagnostic_keymaps()
-  local opts = { silent = true }
-
-  -- Navigation diagnostics
-  vim.keymap.set('n', '<leader>dd', vim.diagnostic.open_float,
-    vim.tbl_extend('force', opts, { desc = 'Show line diagnostics' }))
-  vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, vim.tbl_extend('force', opts, { desc = 'Previous diagnostic' }))
-  vim.keymap.set('n', ']d', vim.diagnostic.goto_next, vim.tbl_extend('force', opts, { desc = 'Next diagnostic' }))
-  vim.keymap.set('n', '<leader>dl', vim.diagnostic.setloclist,
-    vim.tbl_extend('force', opts, { desc = 'Diagnostics loclist' }))
-
-  vim.keymap.set('n', '<leader>dcy', function()
-    local diagnostics = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
-    if #diagnostics > 0 then
-      local messages = {}
-      for _, diag in ipairs(diagnostics) do
-        table.insert(messages, diag.message)
-      end
-      vim.fn.setreg('+', table.concat(messages, '\n'))
-      vim.notify('Diagnostic(s) de la ligne copiés dans le presse-papier')
-    else
-      vim.notify('Aucun diagnostic sur cette ligne')
-    end
-  end, vim.tbl_extend('force', opts, { desc = 'Copy line diagnostics' }))
-
-  vim.keymap.set('n', '<leader>dcY', function()
-    local diagnostics = vim.diagnostic.get(0)
-    if #diagnostics > 0 then
-      local messages = {}
-      for _, diag in ipairs(diagnostics) do
-        table.insert(messages, string.format("Ligne %d: %s", diag.lnum + 1, diag.message))
-      end
-      vim.fn.setreg('+', table.concat(messages, '\n'))
-      vim.notify(string.format('%d diagnostic(s) copiés dans le presse-papier', #diagnostics))
-    else
-      vim.notify('Aucun diagnostic dans ce fichier')
-    end
-  end, vim.tbl_extend('force', opts, { desc = 'Copy all diagnostics' }))
-
-  vim.keymap.set('n', '<leader>dcf', function()
-    local diagnostics = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
-    if #diagnostics > 0 then
-      local messages = {}
-      for _, diag in ipairs(diagnostics) do
-        table.insert(messages, diag.message)
-      end
-
-      local buf = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, messages)
-      vim.api.nvim_open_win(buf, true, {
-        relative = 'cursor',
-        width = math.min(80, vim.o.columns - 4),
-        height = math.min(#messages, 10),
-        row = 1,
-        col = 0,
-        border = 'rounded',
-        title = 'Diagnostics (sélectionnables)',
-        title_pos = 'center',
-      })
-      vim.cmd('normal! gg')
-    else
-      vim.notify('Aucun diagnostic sur cette ligne')
-    end
-  end, vim.tbl_extend('force', opts, { desc = 'Show diagnostics in float' }))
-
-  vim.keymap.set('n', '<leader>dcT', function()
-    local diagnostics = vim.diagnostic.get(0)
-    if #diagnostics > 0 then
-      local lines = {}
-      local filename = vim.fn.expand('%:t')
-
-      table.insert(lines, string.format('=== DIAGNOSTICS POUR %s ===', filename))
-      table.insert(lines, string.format('Généré le: %s', os.date('%Y-%m-%d %H:%M:%S')))
-      table.insert(lines, string.format('Total: %d diagnostic(s)', #diagnostics))
-      table.insert(lines, '')
-
-      local by_severity = {}
-      for _, diag in ipairs(diagnostics) do
-        local severity = vim.diagnostic.severity[diag.severity]
-        if not by_severity[severity] then
-          by_severity[severity] = {}
-        end
-        table.insert(by_severity[severity], diag)
-      end
-
-      local severity_order = { 'ERROR', 'WARN', 'INFO', 'HINT' }
-      for _, severity in ipairs(severity_order) do
-        if by_severity[severity] then
-          table.insert(lines, string.format('--- %s (%d) ---', severity, #by_severity[severity]))
-          for _, diag in ipairs(by_severity[severity]) do
-            table.insert(lines, string.format('Ligne %d: %s', diag.lnum + 1, diag.message))
-            if diag.code then
-              table.insert(lines, string.format('  Code: %s', diag.code))
-            end
-            if diag.source then
-              table.insert(lines, string.format('  Source: %s', diag.source))
-            end
-            table.insert(lines, '')
-          end
-        end
-      end
-
-      vim.cmd('tabnew')
-      local buf = vim.api.nvim_get_current_buf()
-
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-      vim.api.nvim_buf_set_name(buf, string.format('Diagnostics_%s_%s', filename, os.date('%H%M%S')))
-      vim.bo[buf].filetype = 'text'
-      vim.bo[buf].buftype = 'nofile'
-      vim.bo[buf].bufhidden = 'wipe'
-      vim.bo[buf].swapfile = false
-
-      vim.cmd('normal! gg')
-      vim.notify(string.format('Diagnostics ouverts dans un nouvel onglet (%d erreurs)', #diagnostics))
-    else
-      vim.notify('Aucun diagnostic dans ce fichier')
-    end
-  end, vim.tbl_extend('force', opts, { desc = 'Open diagnostics in tab' }))
+  vim.keymap.set('n', '<leader>d', vim.diagnostic.open_float, { desc = 'Voir diagnostic' })
+  vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Diagnostic précédent' })
+  vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Diagnostic suivant' })
 end
 
 -- Keymaps LSP
 function M.setup_lsp_keymaps(client, bufnr)
   local opts = { buffer = bufnr, silent = true }
 
-  -- Keymaps LSP communes
-  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, vim.tbl_extend('force', opts, { desc = 'Go to definition' }))
-  vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, vim.tbl_extend('force', opts, { desc = 'Go to declaration' }))
-  vim.keymap.set('n', 'gr', vim.lsp.buf.references, vim.tbl_extend('force', opts, { desc = 'Show references' }))
-  vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, vim.tbl_extend('force', opts, { desc = 'Go to implementation' }))
-  vim.keymap.set('n', 'K', vim.lsp.buf.hover, vim.tbl_extend('force', opts, { desc = 'Hover documentation' }))
-  vim.keymap.set('n', '<leader>K', vim.lsp.buf.signature_help, vim.tbl_extend('force', opts, { desc = 'Signature help' }))
-  vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, vim.tbl_extend('force', opts, { desc = 'Rename symbol' }))
-  vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, vim.tbl_extend('force', opts, { desc = 'Code actions' }))
-  vim.keymap.set('n', '<leader>lf', function()
+  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, vim.tbl_extend('force', opts, { desc = 'Aller à définition' }))
+  vim.keymap.set('n', 'gr', vim.lsp.buf.references, vim.tbl_extend('force', opts, { desc = 'Voir références' }))
+  vim.keymap.set('n', 'K', vim.lsp.buf.hover, vim.tbl_extend('force', opts, { desc = 'Documentation' }))
+  vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, vim.tbl_extend('force', opts, { desc = 'Renommer' }))
+  vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, vim.tbl_extend('force', opts, { desc = 'Actions' }))
+  vim.keymap.set('n', '<leader>f', function()
     vim.lsp.buf.format({ async = true })
-  end, vim.tbl_extend('force', opts, { desc = 'Format code' }))
+  end, vim.tbl_extend('force', opts, { desc = 'Formater' }))
 end
 
--- Keymaps pour les plugins spécifiques
+-- Keymaps plugins
 function M.setup_plugin_keymaps()
-  local opts = { silent = true }
+  -- NEO-TREE
+  vim.keymap.set('n', '<C-n>', '<cmd>Neotree filesystem toggle<cr>', { desc = 'Toggle explorateur' })
 
-  -- Telescope - groupe "f" pour find
-  vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>',
-    vim.tbl_extend('force', opts, { desc = 'Find files' }))
-  vim.keymap.set('n', '<leader>fg', '<cmd>Telescope live_grep<cr>', vim.tbl_extend('force', opts, { desc = 'Live grep' }))
-  vim.keymap.set('n', '<leader>fb', '<cmd>Telescope buffers<cr>',
-    vim.tbl_extend('force', opts, { desc = 'Find buffers' }))
-  vim.keymap.set('n', '<leader>fh', '<cmd>Telescope help_tags<cr>', vim.tbl_extend('force', opts, { desc = 'Help tags' }))
-  vim.keymap.set('n', '<leader>fr', '<cmd>Telescope oldfiles<cr>',
-    vim.tbl_extend('force', opts, { desc = 'Recent files' }))
+  -- TELESCOPE
+  vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { desc = 'Chercher fichiers' })
+  vim.keymap.set('n', '<leader>fg', '<cmd>Telescope live_grep<cr>', { desc = 'Chercher contenu' })
+  vim.keymap.set('n', '<leader>fb', '<cmd>Telescope buffers<cr>', { desc = 'Voir buffers' })
+  vim.keymap.set('n', '<leader>fr', '<cmd>Telescope oldfiles<cr>', { desc = 'Fichiers récents' })
 
-  -- Neo-tree
-  vim.keymap.set('n', '<C-n>', '<cmd>Neotree filesystem toggle<cr>',
-    vim.tbl_extend('force', opts, { desc = 'Toggle Neotree' }))
-  vim.keymap.set('n', '<leader>e', '<cmd>Neotree filesystem focus<cr>',
-    vim.tbl_extend('force', opts, { desc = 'Focus Neotree' }))
+  -- GIT (optionnel - garde seulement si tu utilises)
+  vim.keymap.set('n', '<leader>gs', '<cmd>Git<cr>', { desc = 'Git status' })
+  vim.keymap.set('n', '<leader>gc', '<cmd>Git commit<cr>', { desc = 'Git commit' })
+end
 
-  -- Git - groupe "g" pour git
-  vim.keymap.set('n', '<leader>gs', '<cmd>Git<cr>', vim.tbl_extend('force', opts, { desc = 'Git status' }))
-  vim.keymap.set('n', '<leader>gd', '<cmd>Gdiffsplit<cr>', vim.tbl_extend('force', opts, { desc = 'Git diff' }))
-  vim.keymap.set('n', '<leader>gc', '<cmd>Git commit<cr>', vim.tbl_extend('force', opts, { desc = 'Git commit' }))
-  vim.keymap.set('n', '<leader>gp', '<cmd>Git push<cr>', vim.tbl_extend('force', opts, { desc = 'Git push' }))
-  vim.keymap.set('n', '<leader>gl', '<cmd>Git pull<cr>', vim.tbl_extend('force', opts, { desc = 'Git pull' }))
-  vim.keymap.set('n', '<leader>gb', '<cmd>Git blame<cr>', vim.tbl_extend('force', opts, { desc = 'Git blame' }))
+-- CHEAT SHEET
+function M.show_cheatsheet()
+  local cheatsheet = {
+    "═══════════════════════════════════════════════════════════════════",
+    "                       NEOVIM CHEAT SHEET                        ",
+    "═══════════════════════════════════════════════════════════════════",
+    "",
+    " FICHIERS & NAVIGATION",
+    "  <C-n>         Ouvrir/Fermer l'explorateur de fichiers",
+    "  <Leader>ff    Chercher un fichier par nom",
+    "  <Leader>fg    Chercher dans le contenu des fichiers",
+    "  <Leader>fb    Liste des fichiers ouverts (buffers)",
+    "  <Leader>fr    Fichiers récents",
+    "",
+    " FENÊTRES",
+    "  <C-h/j/k/l>   Naviguer entre fenêtres (←↓↑→)",
+    "  <Tab>         Buffer suivant",
+    "  <S-Tab>       Buffer précédent",
+    "  <Leader>x     Fermer le buffer actuel",
+    "",
+    " CODE (LSP)",
+    "  gd            Aller à la définition",
+    "  gr            Voir toutes les références",
+    "  K             Voir la documentation",
+    "  <Leader>r     Renommer (refactor)",
+    "  <Leader>a     Actions disponibles (corrections)",
+    "  <Leader>f     Formater le code",
+    "",
+    " DIAGNOSTICS",
+    "  <Leader>d     Voir l'erreur détaillée",
+    "  ]d            Erreur suivante",
+    "  [d            Erreur précédente",
+    "",
+    " ESSENTIELS",
+    "  <Leader>w     Sauvegarder",
+    "  <Leader>q     Quitter",
+    "  <Leader>h     Afficher cette aide",
+    "",
+    "═══════════════════════════════════════════════════════════════════",
+    "  Leader = <Space>  |  Fermer cette fenêtre : q ou <Esc>",
+    "═══════════════════════════════════════════════════════════════════",
+  }
 
-  -- LSP-specific - groupe "l" pour lsp
-  vim.keymap.set('n', '<leader>li', '<cmd>LspInfo<cr>', vim.tbl_extend('force', opts, { desc = 'LSP Info' }))
-  vim.keymap.set('n', '<leader>lr', '<cmd>LspRestart<cr>', vim.tbl_extend('force', opts, { desc = 'LSP Restart' }))
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, cheatsheet)
+
+  -- Configuration du buffer
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].buftype = 'nofile'
+  vim.bo[buf].bufhidden = 'wipe'
+  vim.bo[buf].swapfile = false
+  vim.api.nvim_buf_set_name(buf, 'Cheat Sheet')
+
+  vim.cmd('tabsplit')
+  vim.api.nvim_win_set_buf(0, buf)
+
+  -- Fermer avec q ou Esc
+  vim.keymap.set('n', 'q', '<cmd>close<cr>', { buffer = buf, silent = true })
+  vim.keymap.set('n', '<Esc>', '<cmd>close<cr>', { buffer = buf, silent = true })
+
+  vim.api.nvim_set_hl(0, 'CheatsheetText', { fg = '#008b8b' })
+  vim.api.nvim_win_set_option(0, 'winhl', 'Normal:CheatsheetText')
 end
 
 function M.setup()
