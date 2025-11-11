@@ -136,7 +136,7 @@ function M.show_cheatsheet()
   vim.bo[buf].swapfile = false
   vim.api.nvim_buf_set_name(buf, 'Cheat Sheet')
 
-  vim.cmd('tabsplit')
+  vim.cmd('vsplit')
   vim.api.nvim_win_set_buf(0, buf)
 
   -- Fermer avec q ou Esc
