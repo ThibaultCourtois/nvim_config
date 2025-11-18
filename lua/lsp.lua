@@ -3,7 +3,8 @@ local lsp_configs = {
   "config.cmake",
   "config.lua_ls",
   "config.ruff",
-  "config.pyright"
+  "config.pyright",
+  "config.lemminx"
 }
 
 local function setup_lsp_servers()
